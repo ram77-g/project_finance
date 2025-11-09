@@ -2,13 +2,16 @@
 FROM node:18 AS build
 WORKDIR /app
 
-# ✅ Copy client package.json before installing
-COPY client/package*.json ./client/
+# ✅ Copy all necessary files for Vite build (since vite.config.ts is in root)
+COPY package*.json ./
+COPY vite.config.ts ./
+COPY tsconfig*.json ./
+COPY tailwind.config.js ./
+COPY postcss.config.cjs ./
+COPY client ./client
 
-# ✅ Install and build inside client folder
-WORKDIR /app/client
+# ✅ Install dependencies and build frontend
 RUN npm install
-COPY client/ .
 RUN npm run build
 
 # 2. Setup backend runtime
@@ -21,8 +24,8 @@ ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm install --omit=dev
 
-# ✅ Copy built frontend into backend
-COPY --from=build /app/client/dist ./client/dist
+# ✅ Copy built frontend and backend
+COPY --from=build /app/dist ./client/dist
 COPY server ./server
 
 ENV PORT=3000
