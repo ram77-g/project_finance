@@ -1,19 +1,22 @@
 import axios, { AxiosInstance } from 'axios';
 
-// ✅ Define your environment variable type (for Vite)
+// ✅ Define the shape of your environment variables (for Vite)
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string;
 }
 
-declare global {
-  interface ImportMeta {
-    readonly env: ImportMetaEnv;
-  }
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
 }
 
-// ✅ Use production URL or fallback for local dev
+// ✅ Base URL: Render for prod, /api for local
 const baseURL: string =
-  import.meta.env?.VITE_API_BASE_URL || 'https://project-finance-u6w2.onrender.com/api';
+  import.meta.env.VITE_API_BASE_URL || '/api';
+
+// 🔍 Optional: log baseURL in development for sanity
+if (import.meta.env.MODE !== 'production') {
+  console.log('🌐 Using API base URL:', baseURL);
+}
 
 // ✅ Create Axios instances
 const api: AxiosInstance = axios.create({
@@ -21,7 +24,7 @@ const api: AxiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // 🔥 Keeps auth headers & cookies across domains
+  withCredentials: true, // allows cross-domain cookies and headers
 });
 
 const uploadApi: AxiosInstance = axios.create({
