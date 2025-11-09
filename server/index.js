@@ -28,7 +28,12 @@ app.use(
 );
 app.use(express.json());
 
-// Serve uploads folder
+// ✅ Health check route — simple test to verify backend is alive
+app.get('/api/ping', (req, res) => {
+  res.json({ message: '✅ Server is up and running!' });
+});
+
+// Serve uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // API Routes
@@ -37,23 +42,20 @@ app.use('/api/users', userRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/receipts', receiptRoutes);
 
-// ✅ Serve frontend (React build)
+// Serve frontend build
 app.use(express.static(path.join(__dirname, '../client/dist')));
-
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/dist', 'index.html'));
 });
 
-// DB & Start Server
+// Database connection + Start server
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('Connected to MongoDB');
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-    });
+    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   })
-  .catch((error) => {
-    console.error('Database connection error:', error);
+  .catch((err) => {
+    console.error('Database connection error:', err);
     process.exit(1);
   });
