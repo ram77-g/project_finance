@@ -1,7 +1,14 @@
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 
-// ✅ Define the shape of your environment variables (for Vite)
+/* -------------------------------------------------------------------------- */
+/* 🌐 Environment Setup                                                       */
+/* -------------------------------------------------------------------------- */
+
+// ✅ Define the shape of environment variables for TypeScript (Vite-style)
 interface ImportMetaEnv {
+  readonly MODE?: string;
+  readonly PROD?: boolean;
+  readonly DEV?: boolean;
   readonly VITE_API_BASE_URL?: string;
 }
 
@@ -9,24 +16,32 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
-// ✅ Base URL: Render for prod, /api for local
+// ✅ Dynamically select correct backend URL based on environment
 const baseURL: string =
-  import.meta.env.VITE_API_BASE_URL || '/api';
+  import.meta.env.PROD
+    ? import.meta.env.VITE_API_BASE_URL ||
+      'https://project-finance-u6w2.onrender.com/api' // Production Render
+    : 'http://localhost:5000/api';                    // Local Development
 
-// 🔍 Optional: log baseURL in development for sanity
-if (import.meta.env.MODE !== 'production') {
-  console.log('🌐 Using API base URL:', baseURL);
+// ✅ Optional: log baseURL in dev for sanity check
+if (import.meta.env.DEV) {
+  console.log('🌍 Using API base URL:', baseURL);
 }
 
-// ✅ Create Axios instances
+/* -------------------------------------------------------------------------- */
+/* ⚙️ Axios Instance Creation                                                 */
+/* -------------------------------------------------------------------------- */
+
+// JSON-based API instance
 const api: AxiosInstance = axios.create({
   baseURL,
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // allows cross-domain cookies and headers
+  withCredentials: true, // 🔥 required for cross-origin cookies + JWT
 });
 
+// Multipart (file upload) API instance
 const uploadApi: AxiosInstance = axios.create({
   baseURL,
   headers: {
@@ -35,25 +50,73 @@ const uploadApi: AxiosInstance = axios.create({
   withCredentials: true,
 });
 
-// ✅ Helper to get JWT token from localStorage
+/* -------------------------------------------------------------------------- */
+/* 🔐 Token Handling                                                          */
+/* -------------------------------------------------------------------------- */
+
+// ✅ Helper: safely get token from localStorage
 function getAuthToken(): string | null {
-  return localStorage.getItem('token');
+  try {
+    return localStorage.getItem('token');
+  } catch (err) {
+    console.warn('⚠️ Unable to access localStorage:', err);
+    return null;
+  }
 }
 
-// ✅ Interceptor: attach token to every request
+// ✅ Helper: attach Authorization header
+function attachAuthHeader(config: AxiosRequestConfig): AxiosRequestConfig {
+  const token = getAuthToken();
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers['Authorization'] = `Bearer ${token}`;
+  }
+  return config;
+}
+
+/* -------------------------------------------------------------------------- */
+/* 🔄 Interceptors                                                            */
+/* -------------------------------------------------------------------------- */
+
+// ✅ Request interceptor: adds token to every request
 [api, uploadApi].forEach((instance) => {
   instance.interceptors.request.use(
-    (config) => {
-      const token = getAuthToken();
-      if (token) {
-        config.headers = config.headers || {};
-        config.headers['Authorization'] = `Bearer ${token}`;
-      }
-      return config;
-    },
+    (config) => attachAuthHeader(config),
     (error) => Promise.reject(error)
   );
 });
+
+// ✅ Response interceptor: auto-handle 401 errors gracefully (optional)
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      console.warn('🚫 Unauthorized! Redirecting to login...');
+      // Optional: clear storage or redirect logic here
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    }
+    return Promise.reject(error);
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* 🧰 Optional Utility                                                        */
+/* -------------------------------------------------------------------------- */
+
+// Simple helper to verify backend connectivity
+export async function pingServer(): Promise<void> {
+  try {
+    const { data } = await api.get('/ping');
+    console.log('✅ Backend reachable:', data.message);
+  } catch (err) {
+    console.error('❌ Backend not reachable:', err);
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* 📦 Export                                                                 */
+/* -------------------------------------------------------------------------- */
 
 export { uploadApi };
 export default api;

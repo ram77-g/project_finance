@@ -19,21 +19,23 @@ const PORT = process.env.PORT || 5000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Middleware
+// ✅ Middleware
 app.use(
   cors({
     origin: process.env.FRONTEND_URL || 'http://localhost:5173',
     credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization'], // 🔥 important for JWT
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // allow all main HTTP methods
   })
 );
 app.use(express.json());
 
-// ✅ Health check route — simple test to verify backend is alive
+// ✅ Health check route
 app.get('/api/ping', (req, res) => {
   res.json({ message: '✅ Server is up and running!' });
 });
 
-// Serve uploads
+// Serve uploads folder
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // API Routes
@@ -42,13 +44,13 @@ app.use('/api/users', userRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/receipts', receiptRoutes);
 
-// Serve frontend build
+// ✅ Serve frontend (for production)
 app.use(express.static(path.join(__dirname, '../client/dist')));
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/dist', 'index.html'));
 });
 
-// Database connection + Start server
+// ✅ Database connection + start server
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => {
