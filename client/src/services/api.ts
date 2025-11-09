@@ -1,27 +1,39 @@
-import axios from 'axios';
+import axios, { AxiosInstance } from 'axios';
 
-// ✅ Use production URL from env or fallback to /api for dev
-const baseURL: string = import.meta.env.VITE_API_BASE_URL || 'https://project-finance-u6w2.onrender.com/api';
+// ✅ Define your environment variable type (for Vite)
+interface ImportMetaEnv {
+  readonly VITE_API_BASE_URL?: string;
+}
 
-// ✅ Create JSON and file upload clients
-const api = axios.create({
+declare global {
+  interface ImportMeta {
+    readonly env: ImportMetaEnv;
+  }
+}
+
+// ✅ Use production URL or fallback for local dev
+const baseURL: string =
+  import.meta.env?.VITE_API_BASE_URL || 'https://project-finance-u6w2.onrender.com/api';
+
+// ✅ Create Axios instances
+const api: AxiosInstance = axios.create({
   baseURL,
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // 🔥 ensures cookies + auth headers are allowed across origins
+  withCredentials: true, // 🔥 Keeps auth headers & cookies across domains
 });
 
-const uploadApi = axios.create({
+const uploadApi: AxiosInstance = axios.create({
   baseURL,
   headers: {
     'Content-Type': 'multipart/form-data',
   },
-  withCredentials: true, // 🔥 important for file uploads too
+  withCredentials: true,
 });
 
 // ✅ Helper to get JWT token from localStorage
-function getAuthToken() {
+function getAuthToken(): string | null {
   return localStorage.getItem('token');
 }
 

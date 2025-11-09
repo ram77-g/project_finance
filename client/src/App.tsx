@@ -29,10 +29,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     !!localStorage.getItem('token') && !!localStorage.getItem('user')
   );
 
-  // Keep in sync across tabs
+  // ✅ Ensure we restore auth on first mount
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const user = localStorage.getItem('user');
+    setIsAuthenticated(!!token && !!user);
+  }, []);
+
+  // ✅ Keep auth in sync across tabs
   useEffect(() => {
     const checkAuthState = () => {
-      setIsAuthenticated(!!localStorage.getItem('token') && !!localStorage.getItem('user'));
+      const token = localStorage.getItem('token');
+      const user = localStorage.getItem('user');
+      setIsAuthenticated(!!token && !!user);
     };
     window.addEventListener('storage', checkAuthState);
     return () => window.removeEventListener('storage', checkAuthState);
@@ -58,24 +67,65 @@ function AppRoutes() {
       {/* Protected */}
       <Route
         path="/"
-        element={isAuthenticated ? <Layout><Dashboard /></Layout> : <Navigate to="/login" replace />}
+        element={
+          isAuthenticated ? (
+            <Layout>
+              <Dashboard />
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
       />
       <Route
         path="/transactions"
-        element={isAuthenticated ? <Layout><Transactions /></Layout> : <Navigate to="/login" replace />}
+        element={
+          isAuthenticated ? (
+            <Layout>
+              <Transactions />
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
       />
       <Route
         path="/summary"
-        element={isAuthenticated ? <Layout><Summary /></Layout> : <Navigate to="/login" replace />}
+        element={
+          isAuthenticated ? (
+            <Layout>
+              <Summary />
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
       />
       <Route
         path="/profile"
-        element={isAuthenticated ? <Layout><Profile /></Layout> : <Navigate to="/login" replace />}
+        element={
+          isAuthenticated ? (
+            <Layout>
+              <Profile />
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
       />
       <Route
         path="/receipts"
-        element={isAuthenticated ? <Layout><Receipts /></Layout> : <Navigate to="/login" replace />}
+        element={
+          isAuthenticated ? (
+            <Layout>
+              <Receipts />
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
       />
+
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
@@ -85,9 +135,12 @@ function AppRoutes() {
 export default function App() {
   return (
     <TransactionProvider>
-      <Router>
-        <AppRoutes />
-      </Router>
+      {/* ✅ Wrap routes with AuthProvider */}
+      <AuthProvider>
+        <Router>
+          <AppRoutes />
+        </Router>
+      </AuthProvider>
     </TransactionProvider>
   );
 }
