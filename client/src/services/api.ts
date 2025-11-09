@@ -1,71 +1,66 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 
-/* -------------------------------------------------------------------------- */
-/* 🌐 Environment Setup                                                       */
-/* -------------------------------------------------------------------------- */
-
-// ✅ Define the shape of environment variables for TypeScript (Vite-style)
+/* Env typing for Vite */
 interface ImportMetaEnv {
   readonly MODE?: string;
   readonly PROD?: boolean;
   readonly DEV?: boolean;
-  readonly VITE_API_BASE_URL?: string;
+  readonly VITE_API_BASE_URL?: string; // e.g. https://project-finance-u6w2.onrender.com/api
 }
-
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
-// ✅ Dynamically select correct backend URL based on environment
-const baseURL: string =
-  import.meta.env.PROD
-    ? import.meta.env.VITE_API_BASE_URL ||
-      'https://project-finance-u6w2.onrender.com/api' // Production Render
-    : 'http://localhost:5000/api';                    // Local Development
+/* Base URL selection
+   - In production we prefer VITE_API_BASE_URL (set on Render) or fallback to the known host
+   - In dev we use localhost backend
+*/
+const baseURL: string = import.meta.env.PROD
+  ? import.meta.env.VITE_API_BASE_URL || 'https://project-finance-u6w2.onrender.com/api'
+  : 'http://localhost:5000/api';
 
-// ✅ Optional: log baseURL in dev for sanity check
 if (import.meta.env.DEV) {
   console.log('🌍 Using API base URL:', baseURL);
 }
 
-/* -------------------------------------------------------------------------- */
-/* ⚙️ Axios Instance Creation                                                 */
-/* -------------------------------------------------------------------------- */
+/* serverOrigin: same origin as backend but without the "/api" suffix.
+   Useful for building file URLs (uploads/profile pictures etc.).
+*/
+export const serverOrigin: string = (() => {
+  if (import.meta.env.PROD) {
+    // If VITE_API_BASE_URL is provided (likely includes /api), remove trailing /api
+    const envUrl = import.meta.env.VITE_API_BASE_URL;
+    if (envUrl) return envUrl.replace(/\/api$/, '');
+    return 'https://project-finance-u6w2.onrender.com';
+  }
+  return 'http://localhost:5000';
+})();
 
-// JSON-based API instance
+/* Axios instances */
 const api: AxiosInstance = axios.create({
   baseURL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  withCredentials: true, // 🔥 required for cross-origin cookies + JWT
-});
-
-// Multipart (file upload) API instance
-const uploadApi: AxiosInstance = axios.create({
-  baseURL,
-  headers: {
-    'Content-Type': 'multipart/form-data',
-  },
+  headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
 });
 
-/* -------------------------------------------------------------------------- */
-/* 🔐 Token Handling                                                          */
-/* -------------------------------------------------------------------------- */
+const uploadApi: AxiosInstance = axios.create({
+  baseURL,
+  headers: { 'Content-Type': 'multipart/form-data' },
+  withCredentials: true,
+});
 
-// ✅ Helper: safely get token from localStorage
+/* Token helpers */
 function getAuthToken(): string | null {
   try {
     return localStorage.getItem('token');
   } catch (err) {
-    console.warn('⚠️ Unable to access localStorage:', err);
+    console.warn('Unable to access localStorage', err);
     return null;
   }
 }
 
-// ✅ Helper: attach Authorization header
-function attachAuthHeader(config: AxiosRequestConfig): AxiosRequestConfig {
+/* Attach token */
+function attachAuthHeader(config: AxiosRequestConfig) {
   const token = getAuthToken();
   if (token) {
     config.headers = config.headers || {};
@@ -74,11 +69,7 @@ function attachAuthHeader(config: AxiosRequestConfig): AxiosRequestConfig {
   return config;
 }
 
-/* -------------------------------------------------------------------------- */
-/* 🔄 Interceptors                                                            */
-/* -------------------------------------------------------------------------- */
-
-// ✅ Request interceptor: adds token to every request
+/* Interceptors */
 [api, uploadApi].forEach((instance) => {
   instance.interceptors.request.use(
     (config) => attachAuthHeader(config),
@@ -86,37 +77,20 @@ function attachAuthHeader(config: AxiosRequestConfig): AxiosRequestConfig {
   );
 });
 
-// ✅ Response interceptor: auto-handle 401 errors gracefully (optional)
+/* Handle 401 globally (optional but useful) */
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response && error.response.status === 401) {
-      console.warn('🚫 Unauthorized! Redirecting to login...');
-      // Optional: clear storage or redirect logic here
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+  (res) => res,
+  (err) => {
+    if (err?.response?.status === 401) {
+      // Clear tokens so app logic knows user is not authenticated
+      try {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      } catch (_e) {}
     }
-    return Promise.reject(error);
+    return Promise.reject(err);
   }
 );
 
-/* -------------------------------------------------------------------------- */
-/* 🧰 Optional Utility                                                        */
-/* -------------------------------------------------------------------------- */
-
-// Simple helper to verify backend connectivity
-export async function pingServer(): Promise<void> {
-  try {
-    const { data } = await api.get('/ping');
-    console.log('✅ Backend reachable:', data.message);
-  } catch (err) {
-    console.error('❌ Backend not reachable:', err);
-  }
-}
-
-/* -------------------------------------------------------------------------- */
-/* 📦 Export                                                                 */
-/* -------------------------------------------------------------------------- */
-
-export { uploadApi };
+export { uploadApi, serverOrigin };
 export default api;

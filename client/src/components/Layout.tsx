@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import api from '../services/api'; 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import {
@@ -82,33 +83,32 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   // Persistent Login Check
-  useEffect(() => {
-    const checkAuth = async () => {
-      const token = localStorage.getItem('token');
-      if (!token) return;
+// inside the component:
+useEffect(() => {
+  const checkAuth = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
 
-      try {
-        const res = await fetch('http://localhost:5000/api/me', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (res.ok) {
-          const user = await res.json();
-          localStorage.setItem('user', JSON.stringify(user));
-        } else {
-          handleLogout();
-        }
-      } catch (error) {
-        console.error('Auth check failed:', error);
+    try {
+      // api.get('/me') will call baseURL + '/me', and the interceptor will
+      // automatically add the Authorization header.
+      const res = await api.get('/me');
+      if (res?.data) {
+        localStorage.setItem('user', JSON.stringify(res.data));
+      } else {
+        // logout if no user returned
         handleLogout();
       }
-    };
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      handleLogout();
+    }
+  };
 
-    checkAuth();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  checkAuth();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+
 
   // Show unread notification dot
   useEffect(() => {

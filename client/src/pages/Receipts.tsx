@@ -1,13 +1,11 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { FileText, Upload, Trash2, Eye, X, Check } from 'lucide-react';
-import api, { uploadApi } from '../services/api';
+import api, { uploadApi, serverOrigin } from '../services/api';
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif'];
 const TEXT_TYPES = ['text/plain'];
 const PDF_TYPE = 'application/pdf';
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
-
-const BACKEND_URL = 'http://localhost:5000'; // Adjust if server is different
 
 interface Receipt {
   _id: string;
@@ -42,7 +40,7 @@ const Receipts: React.FC = () => {
 
   const fetchReceipts = async () => {
     try {
-      const res = await api.get('/receipts', { withCredentials: true });
+      const res = await api.get('/receipts');
       setReceipts(res.data);
       setError(null);
     } catch {
@@ -55,6 +53,7 @@ const Receipts: React.FC = () => {
     const files = e.target.files;
     let formData = new FormData();
     let hasInvalidFile = false;
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       if (![...IMAGE_TYPES, ...TEXT_TYPES, PDF_TYPE].includes(file.type)) {
@@ -69,15 +68,17 @@ const Receipts: React.FC = () => {
       }
       formData.append('receipts', file);
     }
+
     if (hasInvalidFile) {
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
+
     setError(null);
     setUploading(true);
     try {
-      const res = await uploadApi.post('/receipts/upload', formData, { withCredentials: true });
-      setReceipts(prev => [...res.data, ...prev]);
+      const res = await uploadApi.post('/receipts/upload', formData);
+      setReceipts((prev) => [...res.data, ...prev]);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch {
       setError('Failed to upload receipts. Please try again.');
@@ -94,8 +95,8 @@ const Receipts: React.FC = () => {
   const handleDeleteConfirm = async (id: string) => {
     setDeletingId(id);
     try {
-      await api.delete(`/receipts/${id}`, { withCredentials: true });
-      setReceipts(prev => prev.filter(r => r._id !== id));
+      await api.delete(`/receipts/${id}`);
+      setReceipts((prev) => prev.filter((r) => r._id !== id));
       setConfirmDeleteId(null);
     } catch {
       setError('Failed to delete receipt.');
@@ -104,20 +105,16 @@ const Receipts: React.FC = () => {
     }
   };
 
-  // Clicking download now fetches as blob and triggers a download
   const handleDownload = async (receipt: Receipt) => {
     setDownloadingId(receipt._id);
     setError(null);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(
-        `${BACKEND_URL}/api/receipts/${receipt._id}/download`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await fetch(`${serverOrigin}/api/receipts/${receipt._id}/download`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       if (!response.ok) throw new Error('Could not download file');
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -143,7 +140,7 @@ const Receipts: React.FC = () => {
     if (TEXT_TYPES.includes(receipt.fileType)) {
       setLoadingPreview(true);
       try {
-        const response = await fetch(`${BACKEND_URL}${receipt.fileUrl}`);
+        const response = await fetch(`${serverOrigin}${receipt.fileUrl}`);
         const text = await response.text();
         setPreviewText(text);
       } catch {
@@ -166,7 +163,7 @@ const Receipts: React.FC = () => {
   };
 
   const adjustZoom = (delta: number) => {
-    setZoomLevel(prev => {
+    setZoomLevel((prev) => {
       const next = Math.min(4, Math.max(0.25, +(prev + delta).toFixed(2)));
       return next;
     });
@@ -177,16 +174,12 @@ const Receipts: React.FC = () => {
   const handleImageLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
     const img = event.currentTarget;
     const viewport = imageViewportRef.current;
-
     const naturalWidth = img.naturalWidth || 1;
     const naturalHeight = img.naturalHeight || 1;
-
     const viewportWidth = viewport?.clientWidth || window.innerWidth * 0.8;
     const viewportHeight = viewport?.clientHeight || window.innerHeight * 0.7;
-
     const scale = Math.min(viewportWidth / naturalWidth, viewportHeight / naturalHeight, 1);
     const nextZoom = Number.isFinite(scale) && scale > 0 ? scale : 1;
-
     setFitZoom(nextZoom);
     setZoomLevel(nextZoom);
   };
@@ -198,6 +191,7 @@ const Receipts: React.FC = () => {
         <p className="mb-4 text-gray-600 dark:text-gray-300">
           Upload your receipts here. Supported files: Images, PDFs, and Text files (TXT).
         </p>
+
         <input
           type="file"
           multiple
@@ -214,12 +208,14 @@ const Receipts: React.FC = () => {
         >
           <Upload className="mr-2" /> {uploading ? 'Uploading...' : 'Upload Receipts'}
         </button>
+
         {error && <div className="text-red-600 mb-4">{error}</div>}
+
         {receipts.length === 0 ? (
           <p className="text-center text-gray-500 dark:text-gray-400 py-20">No receipts uploaded yet.</p>
         ) : (
           <ul className="space-y-4">
-            {receipts.map(r => (
+            {receipts.map((r) => (
               <li
                 key={r._id}
                 className="flex items-center space-x-4 bg-gray-100/90 dark:bg-gray-700/90 p-3 rounded-lg"
@@ -227,7 +223,7 @@ const Receipts: React.FC = () => {
                 <div className="flex-shrink-0 cursor-pointer" onClick={() => openPreview(r)}>
                   {IMAGE_TYPES.includes(r.fileType) ? (
                     <img
-                      src={`${BACKEND_URL}${r.fileUrl}`}
+                      src={`${serverOrigin}${r.fileUrl}`}
                       alt={r.originalName}
                       className="h-12 w-12 object-cover rounded"
                     />
@@ -235,12 +231,14 @@ const Receipts: React.FC = () => {
                     <FileText className="h-12 w-12 text-gray-600 dark:text-gray-300" />
                   )}
                 </div>
+
                 <div className="flex-1">
                   <p className="font-semibold text-gray-900 dark:text-white">{r.originalName}</p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     {(r.fileSize / 1024).toFixed(1)} KB · {r.fileType}
                   </p>
                 </div>
+
                 <div className="flex space-x-2 items-center">
                   <button
                     title="Preview"
@@ -249,6 +247,7 @@ const Receipts: React.FC = () => {
                   >
                     <Eye />
                   </button>
+
                   <button
                     title="Download"
                     onClick={() => handleDownload(r)}
@@ -274,6 +273,7 @@ const Receipts: React.FC = () => {
                       </svg>
                     )}
                   </button>
+
                   {confirmDeleteId === r._id ? (
                     <>
                       <button
@@ -308,6 +308,7 @@ const Receipts: React.FC = () => {
           </ul>
         )}
       </div>
+
       {/* Preview Modal */}
       {modalOpen && previewReceipt && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
@@ -319,8 +320,13 @@ const Receipts: React.FC = () => {
             >
               <X className="w-6 h-6" />
             </button>
-            <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">{previewReceipt.originalName}</h2>
+
+            <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+              {previewReceipt.originalName}
+            </h2>
+
             {loadingPreview && <p>Loading preview...</p>}
+
             {!loadingPreview && (
               <>
                 {IMAGE_TYPES.includes(previewReceipt.fileType) && (
@@ -353,13 +359,14 @@ const Receipts: React.FC = () => {
                         Reset
                       </button>
                     </div>
+
                     <div className="flex justify-center">
                       <div
                         ref={imageViewportRef}
                         className="max-h-[70vh] w-full overflow-auto flex justify-center items-center"
                       >
                         <img
-                          src={`${BACKEND_URL}${previewReceipt.fileUrl}`}
+                          src={`${serverOrigin}${previewReceipt.fileUrl}`}
                           alt={previewReceipt.originalName}
                           className="rounded shadow"
                           style={{
@@ -373,23 +380,26 @@ const Receipts: React.FC = () => {
                     </div>
                   </div>
                 )}
+
                 {previewReceipt.fileType === PDF_TYPE && (
                   <iframe
-                    src={`${BACKEND_URL}${previewReceipt.fileUrl}`}
+                    src={`${serverOrigin}${previewReceipt.fileUrl}`}
                     className="w-full h-[70vh]"
                     title={previewReceipt.originalName}
                   />
                 )}
+
                 {TEXT_TYPES.includes(previewReceipt.fileType) && previewText && (
                   <pre className="overflow-auto max-h-[70vh] bg-gray-100 dark:bg-gray-900 p-4 rounded whitespace-pre-wrap">
                     {previewText}
                   </pre>
                 )}
-                {(!IMAGE_TYPES.includes(previewReceipt.fileType)
-                  && previewReceipt.fileType !== PDF_TYPE
-                  && !TEXT_TYPES.includes(previewReceipt.fileType)) && (
-                  <p>Cannot preview this file type. Please download to view.</p>
-                )}
+
+                {!IMAGE_TYPES.includes(previewReceipt.fileType) &&
+                  previewReceipt.fileType !== PDF_TYPE &&
+                  !TEXT_TYPES.includes(previewReceipt.fileType) && (
+                    <p>Cannot preview this file type. Please download to view.</p>
+                  )}
               </>
             )}
           </div>

@@ -3,7 +3,7 @@ import { useTransaction } from '../context/TransactionContext';
 import {
   User, Mail, DollarSign, Globe, Save, Camera, Trash2, Upload, Check, X as XIcon, TrendingUp
 } from 'lucide-react';
-import { uploadApi } from '../services/api';
+import api, { uploadApi, serverOrigin } from '../services/api';
 import { useCurrencyConversion } from '../hooks/useCurrencyConversion';
 
 const Profile: React.FC = () => {
@@ -131,9 +131,11 @@ const Profile: React.FC = () => {
   const getProfileImageSrc = () => {
     if (previewImage) return previewImage;
     const userWithPicture = user as any;
-    if (userWithPicture?.profilePicture) return `http://localhost:5000${userWithPicture.profilePicture}`;
-    return null;
+    if (userWithPicture?.profilePicture)
+    return `${serverOrigin}${userWithPicture.profilePicture}`;
+  return null;
   };
+
 
   const hasProfilePicture = () => {
     const userWithPicture = user as any;
