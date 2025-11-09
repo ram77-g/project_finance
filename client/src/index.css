@@ -1,3 +1,40 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer components {
+  .dashboard-card {
+    position: relative;
+    overflow: visible;
+    isolation: isolate;
+    z-index: 0;
+  }
+
+  .dashboard-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(140deg, rgba(16, 185, 129, 0.8), rgba(59, 130, 246, 0.75));
+    transition: opacity 0.25s ease-in-out;
+    opacity: 0;
+    pointer-events: none;
+    z-index: -1;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+  }
+
+  .dark .dashboard-card::before {
+    opacity: 1;
+  }
+
+  .dark .dashboard-card {
+    box-shadow:
+      0 0 0 1px rgba(16, 185, 129, 0.35),
+      0 0 20px rgba(16, 185, 129, 0.15),
+      0 0 28px rgba(59, 130, 246, 0.18);
+  }
+}

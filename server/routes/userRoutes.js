@@ -38,13 +38,13 @@ const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
+    fileSize: 5 * 1024 * 1024, //5MB
   }
 });
 
-// --- ALL ROUTES BELOW THIS LINE NOW REQUIRE JWT ---
+//ALL ROUTES BELOW THIS NOW REQUIRE JWT 
 
-// Get current user (authenticated)
+//Get current user
 router.get('/default', requireAuth, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId).select('-password');
@@ -55,7 +55,7 @@ router.get('/default', requireAuth, async (req, res) => {
   }
 });
 
-// Update user profile (authenticated)
+//Update profile
 router.put('/profile', requireAuth, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
@@ -81,7 +81,7 @@ router.put('/profile', requireAuth, async (req, res) => {
   }
 });
 
-// Upload profile picture (authenticated)
+//Upload pfp
 router.post('/profile/upload-picture', requireAuth, upload.single('profilePicture'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
@@ -115,7 +115,7 @@ router.post('/profile/upload-picture', requireAuth, upload.single('profilePictur
   }
 });
 
-// Delete profile picture (authenticated)
+//Delete pfp
 router.delete('/profile/delete-picture', requireAuth, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);

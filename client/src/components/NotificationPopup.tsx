@@ -49,9 +49,12 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ isOpen, onClose }
         ) : (
           <ul className="space-y-2">
             {notifications.map((n) => (
-              <li key={n.id} className="p-2 bg-gray-100 dark:bg-gray-700 rounded">
-                {n.message}
-                <div className="text-xs text-gray-400">
+              <li
+                key={n.id}
+                className="p-2 bg-gray-100 dark:bg-gray-700 rounded text-gray-900 dark:text-white"
+              >
+                <p>{n.message}</p>
+                <div className="text-xs text-gray-500 dark:text-gray-300">
                   {new Date(n.timestamp).toLocaleString('en-GB')} {/* DD/MM/YYYY */}
                 </div>
               </li>

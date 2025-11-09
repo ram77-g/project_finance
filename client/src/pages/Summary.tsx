@@ -3,6 +3,7 @@ import { useTransaction } from '../context/TransactionContext';
 import { Calendar, TrendingUp, TrendingDown, DollarSign, BarChart3 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import api from '../services/api';
+import { currencyService } from '../services/currencyService';
 
 // Define transaction type interface
 interface Transaction {
@@ -56,6 +57,66 @@ const Summary: React.FC = () => {
   
   const [loading, setLoading] = useState(false);
   const [quickSelect, setQuickSelect] = useState('thisMonth');
+  const [convertedSummaryData, setConvertedSummaryData] = useState<SummaryData>(summaryData);
+
+  // Convert summary data when currency changes
+  useEffect(() => {
+    const convertSummaryData = async () => {
+      if (!user || !user.currency) {
+        setConvertedSummaryData(summaryData);
+        return;
+      }
+      
+      // Collect all amounts to convert in one batch
+      const allAmounts: number[] = [
+        summaryData.totalIncome,
+        summaryData.totalExpenses,
+        summaryData.totalBalance,
+        ...summaryData.transactions.map(t => t.amount),
+        ...summaryData.categoryBreakdown.map(c => c.amount),
+        ...summaryData.monthlyTrends.flatMap(m => [m.income, m.expenses, m.balance])
+      ];
+      
+      // Batch convert all amounts at once
+      const convertedAmounts = await currencyService.convertMultiple(allAmounts, 'USD', user.currency);
+      
+      let index = 0;
+      const totalIncome = convertedAmounts[index++];
+      const totalExpenses = convertedAmounts[index++];
+      const totalBalance = convertedAmounts[index++];
+      
+      // Map converted transaction amounts
+      const convertedTransactions = summaryData.transactions.map((t) => ({
+        ...t,
+        amount: convertedAmounts[index++]
+      }));
+      
+      // Map converted category breakdown amounts
+      const convertedCategoryBreakdown = summaryData.categoryBreakdown.map((c) => ({
+        ...c,
+        amount: convertedAmounts[index++]
+      }));
+      
+      // Map converted monthly trends amounts
+      const convertedMonthlyTrends = summaryData.monthlyTrends.map((m) => ({
+        ...m,
+        income: convertedAmounts[index++],
+        expenses: convertedAmounts[index++],
+        balance: convertedAmounts[index++]
+      }));
+      
+      setConvertedSummaryData({
+        totalIncome,
+        totalExpenses,
+        totalBalance,
+        transactions: convertedTransactions,
+        categoryBreakdown: convertedCategoryBreakdown,
+        monthlyTrends: convertedMonthlyTrends
+      });
+    };
+    
+    convertSummaryData();
+  }, [summaryData, user?.currency]);
 
   const quickSelectOptions = [
     { value: 'thisMonth', label: 'This Month' },
@@ -133,15 +194,15 @@ const Summary: React.FC = () => {
   }, []);
 
   // Calculate transaction statistics with proper typing
-  const incomeTransactions = summaryData.transactions?.filter((t: Transaction) => t.type === 'income') || [];
-  const expenseTransactions = summaryData.transactions?.filter((t: Transaction) => t.type === 'expense') || [];
+  const incomeTransactions = convertedSummaryData.transactions?.filter((t: Transaction) => t.type === 'income') || [];
+  const expenseTransactions = convertedSummaryData.transactions?.filter((t: Transaction) => t.type === 'expense') || [];
   
   const avgIncomeTransaction = incomeTransactions.length > 0 
-    ? summaryData.totalIncome / incomeTransactions.length 
+    ? convertedSummaryData.totalIncome / incomeTransactions.length 
     : 0;
   
   const avgExpenseTransaction = expenseTransactions.length > 0 
-    ? summaryData.totalExpenses / expenseTransactions.length 
+    ? convertedSummaryData.totalExpenses / expenseTransactions.length 
     : 0;
 
   const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#F97316', '#84CC16'];
@@ -155,7 +216,7 @@ const Summary: React.FC = () => {
       </div>
 
       {/* Date Range Selector */}
-      <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg">
+      <div className="dashboard-card bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg">
         <div className="flex items-center space-x-2 mb-4">
           <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Select Time Period</h3>
@@ -222,12 +283,12 @@ const Summary: React.FC = () => {
         <>
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg hover:shadow-xl transition-all duration-300">
+            <div className="dashboard-card bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg hover:shadow-xl transition-all duration-300">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Total Income</p>
                   <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                    {formatCurrency(summaryData.totalIncome)}
+                    {formatCurrency(convertedSummaryData.totalIncome)}
                   </p>
                 </div>
                 <div className="bg-green-100 dark:bg-green-900 p-3 rounded-full">
@@ -236,12 +297,12 @@ const Summary: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg hover:shadow-xl transition-all duration-300">
+            <div className="dashboard-card bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg hover:shadow-xl transition-all duration-300">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Total Expenses</p>
                   <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                    {formatCurrency(summaryData.totalExpenses)}
+                    {formatCurrency(convertedSummaryData.totalExpenses)}
                   </p>
                 </div>
                 <div className="bg-red-100 dark:bg-red-900 p-3 rounded-full">
@@ -250,12 +311,12 @@ const Summary: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg hover:shadow-xl transition-all duration-300">
+            <div className="dashboard-card bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg hover:shadow-xl transition-all duration-300">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Net Balance</p>
-                  <p className={`text-2xl font-bold ${summaryData.totalBalance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                    {formatCurrency(summaryData.totalBalance)}
+                  <p className={`text-2xl font-bold ${convertedSummaryData.totalBalance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {formatCurrency(convertedSummaryData.totalBalance)}
                   </p>
                 </div>
                 <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-full">
@@ -268,12 +329,12 @@ const Summary: React.FC = () => {
           {/* Charts Section */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Monthly Trends */}
-            {summaryData.monthlyTrends && summaryData.monthlyTrends.length > 0 && (
-              <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg">
+            {convertedSummaryData.monthlyTrends && convertedSummaryData.monthlyTrends.length > 0 && (
+              <div className="dashboard-card bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Monthly Trends</h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={summaryData.monthlyTrends}>
+                    <LineChart data={convertedSummaryData.monthlyTrends}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="month" />
                       <YAxis />
@@ -288,14 +349,14 @@ const Summary: React.FC = () => {
             )}
 
             {/* Category Breakdown */}
-            {summaryData.categoryBreakdown && summaryData.categoryBreakdown.length > 0 && (
-              <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg">
+            {convertedSummaryData.categoryBreakdown && convertedSummaryData.categoryBreakdown.length > 0 && (
+              <div className="dashboard-card bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Expense Categories</h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={summaryData.categoryBreakdown}
+                        data={convertedSummaryData.categoryBreakdown}
                         cx="50%"
                         cy="50%"
                         labelLine={false}
@@ -304,7 +365,7 @@ const Summary: React.FC = () => {
                         fill="#8884d8"
                         dataKey="amount"
                       >
-                        {summaryData.categoryBreakdown.map((entry, index) => (
+                        {convertedSummaryData.categoryBreakdown.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
@@ -319,7 +380,7 @@ const Summary: React.FC = () => {
           {/* Transaction Statistics */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Income Statistics */}
-            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg">
+            <div className="dashboard-card bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg">
               <div className="flex items-center space-x-3 mb-4">
                 <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Income Statistics</h3>
@@ -341,7 +402,7 @@ const Summary: React.FC = () => {
             </div>
 
             {/* Expense Statistics */}
-            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg">
+            <div className="dashboard-card bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg">
               <div className="flex items-center space-x-3 mb-4">
                 <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Expense Statistics</h3>
@@ -364,7 +425,7 @@ const Summary: React.FC = () => {
           </div>
 
           {/* Period Information */}
-          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg">
+          <div className="dashboard-card bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg">
             <div className="flex items-center space-x-3 mb-4">
               <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Period Information</h3>

@@ -4,10 +4,10 @@ import requireAuth from '../middleware/requireAuth.js';
 
 const router = express.Router();
 
-// ------- ALL ROUTES REQUIRE AUTH -------
+//ALL ROUTES REQUIRE AUTH
 router.use(requireAuth);
 
-// Get all transactions for the logged-in user
+//Get all transactions
 router.get('/', async (req, res) => {
   try {
     const transactions = await Transaction.find({ userId: req.user.userId }).sort({ date: -1 });
@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Create a new transaction for the logged-in user
+//Create new transaction
 router.post('/', async (req, res) => {
   try {
     const transaction = new Transaction({
@@ -31,7 +31,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Update a transaction - only if it belongs to the logged-in user
+//Update a transaction
 router.put('/:id', async (req, res) => {
   try {
     const transaction = await Transaction.findOneAndUpdate(
@@ -48,7 +48,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Delete a transaction - only if it belongs to the logged-in user
+//Delete a transaction
 router.delete('/:id', async (req, res) => {
   try {
     const transaction = await Transaction.findOneAndDelete({
@@ -64,14 +64,14 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// Get financial summary for the current user
+//Get financial summary
 router.get('/summary', async (req, res) => {
   try {
     const currentDate = new Date();
     const currentMonth = currentDate.getMonth();
     const currentYear = currentDate.getFullYear();
 
-    // Monthly summary
+    //Monthly summary
     const monthlyTransactions = await Transaction.find({
       userId: req.user.userId,
       date: {
@@ -88,7 +88,7 @@ router.get('/summary', async (req, res) => {
       .filter(t => t.type === 'expense')
       .reduce((sum, t) => sum + t.amount, 0);
 
-    // Yearly summary
+    //Yearly summary
     const yearlyTransactions = await Transaction.find({
       userId: req.user.userId,
       date: {
@@ -122,7 +122,7 @@ router.get('/summary', async (req, res) => {
   }
 });
 
-// Get custom date range summary for the current user
+//Get custom date summary
 router.get('/summary/custom', async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
@@ -135,7 +135,7 @@ router.get('/summary/custom', async (req, res) => {
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
 
-    // Get transactions in the range for this user
+    //Get transactions in the range for this user
     const transactions = await Transaction.find({
       userId: req.user.userId,
       date: {
@@ -154,7 +154,7 @@ router.get('/summary/custom', async (req, res) => {
 
     const totalBalance = totalIncome - totalExpenses;
 
-    // Category breakdown for expenses
+    //Categories for expenses
     const categoryBreakdown = transactions
       .filter(t => t.type === 'expense')
       .reduce((acc, t) => {
@@ -167,7 +167,7 @@ router.get('/summary/custom', async (req, res) => {
         return acc;
       }, []);
 
-    // Monthly trends
+    //Monthly trends
     const monthlyTrends = [];
     const startMonth = new Date(start.getFullYear(), start.getMonth(), 1);
     const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTransaction } from '../context/TransactionContext';
 import { getCurrencySymbol } from '../context/TransactionContext';
+import { currencyService } from '../services/currencyService';
 import { X, DollarSign, FileText, Calendar, Tag, AlertTriangle } from 'lucide-react';
 
 interface TransactionModalProps {
@@ -36,28 +37,39 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, tr
   ];
 
   useEffect(() => {
-    if (transaction) {
-      setFormData({
-        title: transaction.title,
-        amount: transaction.amount.toString(),
-        type: transaction.type,
-        category: transaction.category,
-        description: transaction.description,
-        date: new Date(transaction.date).toISOString().split('T')[0]
-      });
-    } else {
-      setFormData({
-        title: '',
-        amount: '',
-        type: 'expense',
-        category: '',
-        description: '',
-        date: new Date().toISOString().split('T')[0]
-      });
-    }
-    setShowDuplicateWarning(false);
-    setDuplicateTransactions([]);
-  }, [transaction]);
+    const initializeForm = async () => {
+      if (transaction) {
+        let displayAmount = transaction.amount.toString();
+        if (user?.currency && user.currency !== 'USD') {
+          const converted = await currencyService.convertCurrency(transaction.amount, 'USD', user.currency);
+          if (converted !== null) {
+            displayAmount = converted.toFixed(2);
+          }
+        }
+        setFormData({
+          title: transaction.title,
+          amount: displayAmount,
+          type: transaction.type,
+          category: transaction.category,
+          description: transaction.description,
+          date: new Date(transaction.date).toISOString().split('T')[0]
+        });
+      } else {
+        setFormData({
+          title: '',
+          amount: '',
+          type: 'expense',
+          category: '',
+          description: '',
+          date: new Date().toISOString().split('T')[0]
+        });
+      }
+      setShowDuplicateWarning(false);
+      setDuplicateTransactions([]);
+    };
+
+    initializeForm();
+  }, [transaction, user?.currency]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -104,9 +116,21 @@ const TransactionModal: React.FC<TransactionModalProps> = ({ isOpen, onClose, tr
     setLoading(true);
 
     try {
+      let amountInUSD = parseFloat(formData.amount);
+      if (user?.currency && user.currency !== 'USD') {
+        const converted = await currencyService.convertCurrency(amountInUSD, user.currency, 'USD');
+        if (converted !== null) {
+          amountInUSD = converted;
+        } else {
+          console.error('Currency conversion failed.');
+          setLoading(false);
+          return;
+        }
+      }
+
       const transactionData = {
         title: formData.title,
-        amount: parseFloat(formData.amount),
+        amount: amountInUSD,
         type: formData.type as 'income' | 'expense',
         category: formData.category,
         description: formData.description,

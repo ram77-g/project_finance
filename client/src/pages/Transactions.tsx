@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTransaction } from '../context/TransactionContext';
 import { Plus, Edit2, Trash2, TrendingUp, TrendingDown, Search, Filter, Check, X } from 'lucide-react';
 import TransactionModal from '../components/TransactionModal';
+import { currencyService } from '../services/currencyService';
 
 const Transactions: React.FC = () => {
   const { state, deleteTransaction, formatCurrency } = useTransaction();
-  const { transactions, loading } = state;
+  const { transactions, loading, user } = state;
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState(null);
@@ -13,12 +14,36 @@ const Transactions: React.FC = () => {
   const [filterType, setFilterType] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [convertedTransactions, setConvertedTransactions] = useState(transactions);
+
+  // Convert transactions when currency changes
+  useEffect(() => {
+    const convertTransactions = async () => {
+      if (!user || !user.currency) {
+        setConvertedTransactions(transactions);
+        return;
+      }
+      
+      // Batch convert all transaction amounts at once
+      const amounts = transactions.map(t => t.amount);
+      const convertedAmounts = await currencyService.convertMultiple(amounts, 'USD', user.currency);
+      
+      const converted = transactions.map((t, index) => ({
+        ...t,
+        convertedAmount: convertedAmounts[index]
+      }));
+      
+      setConvertedTransactions(converted);
+    };
+    
+    convertTransactions();
+  }, [transactions, user?.currency]);
 
   // Get unique categories
   const categories = [...new Set(transactions.map(t => t.category))];
 
   // Filter transactions
-  const filteredTransactions = transactions.filter(transaction => {
+  const filteredTransactions = convertedTransactions.filter(transaction => {
     const matchesSearch = transaction.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           transaction.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = filterType === 'all' || transaction.type === filterType;
@@ -76,7 +101,7 @@ const Transactions: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg">
+      <div className="dashboard-card bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-white/20 dark:border-gray-700/20 shadow-lg">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 h-5 w-5" />
@@ -113,7 +138,7 @@ const Transactions: React.FC = () => {
       </div>
 
       {/* Transactions List */}
-      <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl border border-white/20 dark:border-gray-700/20 shadow-lg overflow-hidden">
+      <div className="dashboard-card bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl border border-white/20 dark:border-gray-700/20 shadow-lg overflow-hidden">
         {filteredTransactions.length === 0 ? (
           <div className="p-8 text-center">
             <p className="text-gray-500 dark:text-gray-400">No transactions found</p>
@@ -167,7 +192,7 @@ const Transactions: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${transaction.type === 'income' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'}`}>
                         {transaction.category}
                       </span>
                     </td>
@@ -175,7 +200,7 @@ const Transactions: React.FC = () => {
                       <span className={`text-sm font-semibold ${
                         transaction.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                       }`}>
-                        {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                        {transaction.type === 'income' ? '+' : '-'}{formatCurrency((transaction as any).convertedAmount || transaction.amount)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">

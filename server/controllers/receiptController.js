@@ -65,7 +65,7 @@ export const uploadReceipt = async (req, res) => {
   }
 };
 
-// DELETE /api/receipts/:id - Remove receipt and file
+// DELETE Remove receipt and file
 export const deleteReceipt = async (req, res) => {
   try {
     const receipt = await Receipt.findOne({ _id: req.params.id, user: req.user?.userId });

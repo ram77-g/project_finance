@@ -18,7 +18,7 @@ const requireAuth = async (req, res, next) => {
       return res.status(401).json({ error: 'Unauthorized: User not found' });
     }
 
-    // Attach full user document or just ID to req.user
+    //Attach full user document or just ID to req.user
     req.user = { userId: user._id };
 
     next();

@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
-/** Password validation helper */
+/** Password validation */
 const validatePassword = (password) => {
   const minLength = 8;
   const hasUpperCase = /[A-Z]/.test(password);
@@ -21,7 +21,7 @@ const validatePassword = (password) => {
   return { valid: true };
 };
 
-/** @desc Signup controller */
+/** Signup controller */
 export const signup = async (req, res) => {
   try {
     const { firstName, lastName, email, password } = req.body;
@@ -72,7 +72,7 @@ export const signup = async (req, res) => {
   }
 };
 
-/** @desc Login controller */
+/** Login controller */
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -111,7 +111,7 @@ export const login = async (req, res) => {
   }
 };
 
-/** @desc Get Current User */
+/** Get Current User */
 export const getCurrentUser = async (req, res) => {
   try {
     if (!req.user) {

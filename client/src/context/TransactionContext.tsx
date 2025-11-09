@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import api from '../services/api';
+import { currencyService } from '../services/currencyService';
 
 // --- Types ---
 interface Transaction {
@@ -26,6 +27,7 @@ interface Notification {
   id: string;
   message: string;
   timestamp: number;
+  read: boolean;
 }
 
 interface State {
@@ -52,6 +54,7 @@ type Action =
   | { type: 'SET_THEME'; payload: 'light' | 'dark' }
   | { type: 'TOGGLE_THEME' }
   | { type: 'ADD_NOTIFICATION'; payload: Notification }
+  | { type: 'MARK_NOTIFICATIONS_READ' }
   | { type: 'CLEAR_NOTIFICATIONS' };
 
 // --- Initial State ---
@@ -108,6 +111,7 @@ const TransactionContext = createContext<{
   resetState: () => void;
   toggleTheme: () => void;
   formatCurrency: (amount: number) => string;
+  markNotificationsRead: () => void;
 } | undefined>(undefined);
 
 // --- Reducer ---
@@ -156,6 +160,13 @@ function transactionReducer(state: State, action: Action): State {
       return { ...state, theme: newTheme };
     case 'ADD_NOTIFICATION':
       return { ...state, notifications: [action.payload, ...state.notifications] };
+    case 'MARK_NOTIFICATIONS_READ':
+      return {
+        ...state,
+        notifications: state.notifications.map(notification =>
+          notification.read ? notification : { ...notification, read: true }
+        ),
+      };
     case 'CLEAR_NOTIFICATIONS':
       return { ...state, notifications: [] };
     default:
@@ -188,6 +199,13 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     try {
       const response = await api.get('/users/default'); // Now JWT required, correct user only
       dispatch({ type: 'SET_USER', payload: response.data });
+      
+      // Pre-fetch exchange rates when user loads to cache them
+      if (response.data.currency && response.data.currency !== 'USD') {
+        currencyService.getExchangeRates().catch(err => 
+          console.error('Error pre-fetching exchange rates:', err)
+        );
+      }
     } catch (error) {
       console.error('Error fetching user:', error);
     }
@@ -234,9 +252,43 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
 
   const updateUser = async (userData: Partial<User>) => {
     try {
+      const previousUser = state.user;
       const response = await api.put('/users/profile', userData);
       dispatch({ type: 'SET_USER', payload: response.data });
       await fetchSummary();
+
+      if (previousUser) {
+        const budgetChanged =
+          typeof userData.monthlyBudget === 'number' &&
+          userData.monthlyBudget !== previousUser.monthlyBudget;
+        const currencyChanged =
+          typeof userData.currency === 'string' &&
+          userData.currency !== previousUser.currency;
+
+        if (budgetChanged || currencyChanged) {
+          const newBudget =
+            typeof userData.monthlyBudget === 'number'
+              ? userData.monthlyBudget
+              : response.data.monthlyBudget;
+          const newCurrency = userData.currency || response.data.currency;
+          const currencySymbol = getCurrencySymbol(newCurrency);
+
+          const formattedBudget = newBudget.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          });
+
+          dispatch({
+            type: 'ADD_NOTIFICATION',
+            payload: {
+              id: `budget-update-${Date.now()}`,
+              message: `Monthly budget updated to ${currencySymbol}${formattedBudget} (${newCurrency}).`,
+              timestamp: Date.now(),
+              read: false,
+            },
+          });
+        }
+      }
     } catch (error) {
       console.error('Error updating user:', error);
     }
@@ -250,30 +302,58 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
 
   // Check monthly budget
   useEffect(() => {
-    if (
-      state.user &&
-      state.user.monthlyBudget > 0 &&
-      state.summary.monthly.expenses > state.user.monthlyBudget
-    ) {
-      const now = new Date();
-      const alreadyNotified = state.notifications.some(
-        n =>
-          n.message.includes('Monthly budget exceeded') &&
-          new Date(n.timestamp).getMonth() === now.getMonth() &&
-          new Date(n.timestamp).getFullYear() === now.getFullYear()
-      );
-      if (!alreadyNotified) {
-        dispatch({
-          type: 'ADD_NOTIFICATION',
-          payload: {
-            id: `budget-${Date.now()}`,
-            message: `Monthly budget exceeded! You spent ₹${state.summary.monthly.expenses.toLocaleString()}, the budget is ₹${state.user.monthlyBudget.toLocaleString()}.`,
-            timestamp: Date.now() // still raw Milliseconds
-          }
-        });
+    const checkBudgetExceeded = async () => {
+      if (!state.user || state.user.monthlyBudget <= 0) return;
+
+      let expensesInUserCurrency = state.summary.monthly.expenses;
+
+      if (state.user.currency && state.user.currency !== 'USD') {
+        try {
+          expensesInUserCurrency = await currencyService.convertCurrency(
+            state.summary.monthly.expenses,
+            'USD',
+            state.user.currency
+          );
+        } catch (error) {
+          console.error('Error converting expenses for budget check:', error);
+        }
       }
-    }
-  }, [state.user, state.summary.monthly.expenses]);
+
+      if (expensesInUserCurrency > state.user.monthlyBudget) {
+        const now = new Date();
+        const alreadyNotified = state.notifications.some(
+          n =>
+            n.message.includes('Monthly budget exceeded') &&
+            new Date(n.timestamp).getMonth() === now.getMonth() &&
+            new Date(n.timestamp).getFullYear() === now.getFullYear()
+        );
+
+        if (!alreadyNotified) {
+          const currencySymbol = getCurrencySymbol(state.user.currency);
+          const formattedExpenses = expensesInUserCurrency.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          });
+          const formattedBudget = state.user.monthlyBudget.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          });
+
+          dispatch({
+            type: 'ADD_NOTIFICATION',
+            payload: {
+              id: `budget-${Date.now()}`,
+              message: `Monthly budget exceeded! You spent ${currencySymbol}${formattedExpenses}, the budget is ${currencySymbol}${formattedBudget}.`,
+              timestamp: Date.now(),
+              read: false,
+            },
+          });
+        }
+      }
+    };
+
+    checkBudgetExceeded();
+  }, [state.user, state.summary.monthly.expenses, state.notifications]);
 
   const formatCurrencyWithUserPreference = (amount: number): string =>
     formatCurrency(amount, state.user?.currency || 'USD');
@@ -288,6 +368,9 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     if (state.theme === 'dark') document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
   }, [state.theme]);
+
+  const markNotificationsRead = () =>
+    dispatch({ type: 'MARK_NOTIFICATIONS_READ' });
 
   return (
     <TransactionContext.Provider
@@ -304,6 +387,7 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
         resetState,
         toggleTheme,
         formatCurrency: formatCurrencyWithUserPreference,
+        markNotificationsRead,
       }}
     >
       {children}

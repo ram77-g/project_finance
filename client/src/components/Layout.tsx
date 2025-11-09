@@ -5,7 +5,6 @@ import {
   LayoutDashboard,
   CreditCard,
   User,
-  TrendingUp,
   Moon,
   Sun,
   BarChart3,
@@ -21,11 +20,52 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
+const AnimatedLogoIcon: React.FC = () => (
+  <>
+    <style>
+      {`
+        @keyframes financeGlowPulse {
+          0%, 100% { opacity: 0.5; transform: scale(1); }
+          50% { opacity: 0.9; transform: scale(1.08); }
+        }
+        @keyframes financeBarRise {
+          0%, 100% { transform: scaleY(0.6); }
+          50% { transform: scaleY(1); }
+        }
+        @keyframes financeCoinOrbit {
+          0% { transform: rotate(0deg) translateY(-13px); }
+          50% { transform: rotate(180deg) translateY(-11px); }
+          100% { transform: rotate(360deg) translateY(-13px); }
+        }
+        @keyframes financeArrowPulse {
+          0%, 100% { transform: translate(0, 0); opacity: 0.75; }
+          50% { transform: translate(1px, -1px); opacity: 1; }
+        }
+        .finance-logo .finance-glow { animation: financeGlowPulse 4s ease-in-out infinite; }
+        .finance-logo .finance-bar { animation: financeBarRise 1.8s ease-in-out infinite; transform-origin: bottom center; }
+        .finance-logo .finance-bar:nth-child(2) { animation-delay: -0.3s; }
+        .finance-logo .finance-bar:nth-child(3) { animation-delay: -0.6s; }
+        .finance-logo .finance-coin-orbit { animation: financeCoinOrbit 6s linear infinite; transform-origin: center; }
+        .finance-logo .finance-arrow { animation: financeArrowPulse 2.6s ease-in-out infinite; }
+      `}
+    </style>
+    <span className="finance-logo relative flex h-10 w-10 items-center justify-center">
+      <span className="finance-glow absolute inset-0 rounded-full bg-emerald-400/40 blur-xl" />
+      <span className="absolute inset-[3px] rounded-full bg-gradient-to-br from-gray-900 via-slate-900 to-gray-800 shadow-[0_0_16px_rgba(5,150,105,0.4)]" />
+      <span className="relative flex h-7 w-7 items-end justify-center gap-[4px]">
+        <span className="finance-bar h-[65%] w-1.5 rounded-full bg-emerald-400/80" />
+        <span className="finance-bar h-[85%] w-1.5 rounded-full bg-teal-300/85" />
+        <span className="finance-bar h-full w-1.5 rounded-full bg-sky-300/80" />
+      </span>
+    </span>
+  </>
+);
+
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { setIsAuthenticated } = useAuth();
-  const { state, toggleTheme, resetState } = useTransaction();  // <-- use resetState
+  const { state, toggleTheme, resetState, markNotificationsRead } = useTransaction();  // <-- use resetState
   const { theme, notifications } = state;
 
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
@@ -72,13 +112,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   // Show unread notification dot
   useEffect(() => {
-    if (!isNotificationOpen && notifications.length > 0) {
-      setHasUnread(true);
-    }
     if (isNotificationOpen) {
-      setHasUnread(false);
+      markNotificationsRead();
     }
-  }, [notifications.length, isNotificationOpen]);
+  }, [isNotificationOpen, markNotificationsRead]);
+
+  useEffect(() => {
+    const hasUnreadNotifications = notifications.some(notification => !notification.read);
+    setHasUnread(!isNotificationOpen && hasUnreadNotifications);
+  }, [notifications, isNotificationOpen]);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -92,11 +134,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
-            <div className="flex items-center space-x-2">
-              <TrendingUp className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+            <div className="flex items-center space-x-2.5">
+              <AnimatedLogoIcon />
               <Link
                 to="/"
-                className="text-xl font-bold text-gray-900 dark:text-white"
+                className="text-[1.35rem] font-bold text-gray-900 dark:text-white"
                 aria-label="Go to Dashboard"
                 style={{ textDecoration: 'none' }}
               >

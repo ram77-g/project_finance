@@ -6,13 +6,13 @@ import { fileURLToPath } from 'url';
 import * as receiptController from '../controllers/receiptController.js';
 import requireAuth from '../middleware/requireAuth.js';
 
-// Handle __dirname in ES Modules
+//Handle __dirname in ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
-// Multer storage settings
+//Multer storage settings
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, path.resolve(__dirname, '../uploads'));
@@ -22,7 +22,7 @@ const storage = multer.diskStorage({
   }
 });
 
-// File type & size validation
+//File type & size validation
 const ALLOWED_TYPES = [
   'image/jpeg',
   'image/png',
@@ -30,7 +30,7 @@ const ALLOWED_TYPES = [
   'text/plain',
   'application/pdf'
 ];
-const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_SIZE = 5 * 1024 * 1024; //5MB
 
 const fileFilter = (req, file, cb) => {
   if (ALLOWED_TYPES.includes(file.mimetype)) cb(null, true);
@@ -43,7 +43,7 @@ const upload = multer({
   limits: { fileSize: MAX_SIZE }
 });
 
-// Routes
+//Routes
 router.get('/', requireAuth, receiptController.getReceipts);
 
 router.get('/:id/download', requireAuth, receiptController.downloadReceipt);

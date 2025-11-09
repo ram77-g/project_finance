@@ -25,6 +25,8 @@ const Receipts: React.FC = () => {
   const [previewText, setPreviewText] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [fitZoom, setFitZoom] = useState(1);
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -32,6 +34,7 @@ const Receipts: React.FC = () => {
 
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageViewportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchReceipts();
@@ -134,6 +137,9 @@ const Receipts: React.FC = () => {
 
   const openPreview = async (receipt: Receipt) => {
     setPreviewReceipt(receipt);
+    setZoomLevel(1);
+    setFitZoom(1);
+
     if (TEXT_TYPES.includes(receipt.fileType)) {
       setLoadingPreview(true);
       try {
@@ -155,11 +161,39 @@ const Receipts: React.FC = () => {
     setModalOpen(false);
     setPreviewReceipt(null);
     setPreviewText(null);
+    setZoomLevel(1);
+    setFitZoom(1);
+  };
+
+  const adjustZoom = (delta: number) => {
+    setZoomLevel(prev => {
+      const next = Math.min(4, Math.max(0.25, +(prev + delta).toFixed(2)));
+      return next;
+    });
+  };
+
+  const resetZoom = () => setZoomLevel(fitZoom);
+
+  const handleImageLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = event.currentTarget;
+    const viewport = imageViewportRef.current;
+
+    const naturalWidth = img.naturalWidth || 1;
+    const naturalHeight = img.naturalHeight || 1;
+
+    const viewportWidth = viewport?.clientWidth || window.innerWidth * 0.8;
+    const viewportHeight = viewport?.clientHeight || window.innerHeight * 0.7;
+
+    const scale = Math.min(viewportWidth / naturalWidth, viewportHeight / naturalHeight, 1);
+    const nextZoom = Number.isFinite(scale) && scale > 0 ? scale : 1;
+
+    setFitZoom(nextZoom);
+    setZoomLevel(nextZoom);
   };
 
   return (
     <>
-      <div className="max-w-3xl mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow">
+      <div className="dashboard-card max-w-3xl mx-auto p-6 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl border border-white/20 dark:border-gray-700/20 shadow-lg">
         <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Receipts</h1>
         <p className="mb-4 text-gray-600 dark:text-gray-300">
           Upload your receipts here. Supported files: Images, PDFs, and Text files (TXT).
@@ -188,7 +222,7 @@ const Receipts: React.FC = () => {
             {receipts.map(r => (
               <li
                 key={r._id}
-                className="flex items-center space-x-4 bg-gray-100 dark:bg-gray-700 p-3 rounded"
+                className="flex items-center space-x-4 bg-gray-100/90 dark:bg-gray-700/90 p-3 rounded-lg"
               >
                 <div className="flex-shrink-0 cursor-pointer" onClick={() => openPreview(r)}>
                   {IMAGE_TYPES.includes(r.fileType) ? (
@@ -202,7 +236,7 @@ const Receipts: React.FC = () => {
                   )}
                 </div>
                 <div className="flex-1">
-                  <p className="font-semibold">{r.originalName}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{r.originalName}</p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     {(r.fileSize / 1024).toFixed(1)} KB · {r.fileType}
                   </p>
@@ -285,16 +319,59 @@ const Receipts: React.FC = () => {
             >
               <X className="w-6 h-6" />
             </button>
-            <h2 className="text-xl font-semibold mb-4">{previewReceipt.originalName}</h2>
+            <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">{previewReceipt.originalName}</h2>
             {loadingPreview && <p>Loading preview...</p>}
             {!loadingPreview && (
               <>
                 {IMAGE_TYPES.includes(previewReceipt.fileType) && (
-                  <img
-                    src={`${BACKEND_URL}${previewReceipt.fileUrl}`}
-                    alt={previewReceipt.originalName}
-                    className="max-w-full max-h-[70vh] rounded"
-                  />
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => adjustZoom(-0.25)}
+                        className="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                        disabled={zoomLevel <= 0.5}
+                      >
+                        -
+                      </button>
+                      <span className="text-sm text-gray-600 dark:text-gray-300 w-16 text-center">
+                        {(zoomLevel * 100).toFixed(0)}%
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => adjustZoom(0.25)}
+                        className="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                        disabled={zoomLevel >= 3}
+                      >
+                        +
+                      </button>
+                      <button
+                        type="button"
+                        onClick={resetZoom}
+                        className="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                    <div className="flex justify-center">
+                      <div
+                        ref={imageViewportRef}
+                        className="max-h-[70vh] w-full overflow-auto flex justify-center items-center"
+                      >
+                        <img
+                          src={`${BACKEND_URL}${previewReceipt.fileUrl}`}
+                          alt={previewReceipt.originalName}
+                          className="rounded shadow"
+                          style={{
+                            width: `${zoomLevel * 100}%`,
+                            height: 'auto',
+                            maxWidth: 'none',
+                          }}
+                          onLoad={handleImageLoad}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 )}
                 {previewReceipt.fileType === PDF_TYPE && (
                   <iframe
