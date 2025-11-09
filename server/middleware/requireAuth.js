@@ -9,21 +9,30 @@ const requireAuth = async (req, res, next) => {
       return res.status(401).json({ error: 'Unauthorized: Missing token' });
     }
 
+    // Extract token
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
 
+    // Ensure JWT_SECRET is set in the environment
+    if (!process.env.JWT_SECRET) {
+      console.error('❌ Missing JWT_SECRET environment variable');
+      return res.status(500).json({ error: 'Server misconfiguration: Missing JWT secret' });
+    }
+
+    // Verify the token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Find user in database
     const user = await User.findById(decoded.userId);
-
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized: User not found' });
     }
 
-    //Attach full user document or just ID to req.user
+    // Attach user info to the request object
     req.user = { userId: user._id };
 
     next();
   } catch (error) {
-    console.error('Auth middleware error:', error);
+    console.error('Auth middleware error:', error.message);
     return res.status(401).json({ error: 'Unauthorized: Invalid or expired token' });
   }
 };
