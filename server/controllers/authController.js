@@ -21,6 +21,20 @@ const validatePassword = (password) => {
   return { valid: true };
 };
 
+/** Helper — generate JWT safely */
+const generateToken = (user) => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET is not defined in environment variables.');
+  }
+
+  return jwt.sign(
+    { userId: user._id, email: user.email, firstName: user.firstName },
+    secret,
+    { expiresIn: '24h' }
+  );
+};
+
 /** Signup controller */
 export const signup = async (req, res) => {
   try {
@@ -50,11 +64,7 @@ export const signup = async (req, res) => {
     });
     await user.save();
 
-    const token = jwt.sign(
-      { userId: user._id, email: user.email, firstName: user.firstName },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '24h' }
-    );
+    const token = generateToken(user);
 
     res.status(201).json({
       message: 'User created successfully',
@@ -89,11 +99,7 @@ export const login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    const token = jwt.sign(
-      { userId: user._id, email: user.email, firstName: user.firstName },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '24h' }
-    );
+    const token = generateToken(user);
 
     res.json({
       message: 'Login successful',
