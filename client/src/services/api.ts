@@ -92,5 +92,5 @@ api.interceptors.response.use(
   }
 );
 
-export { uploadApi, serverOrigin };
+export { uploadApi};
 export default api;
