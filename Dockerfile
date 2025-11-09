@@ -5,8 +5,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY client ./client
 
-RUN npm install
-RUN npm run build
+# ✅ Install and build inside the client folder
+RUN cd client && npm install && npm run build
 
 # 2. Setup backend runtime
 FROM node:18
@@ -17,7 +17,8 @@ ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm install --omit=dev
 
-COPY --from=build /app/dist ./client/dist
+# ✅ Copy built frontend correctly
+COPY --from=build /app/client/dist ./client/dist
 COPY server ./server
 
 ENV PORT=3000
